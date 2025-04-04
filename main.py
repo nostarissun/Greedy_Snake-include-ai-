@@ -1,4 +1,4 @@
 import game
 
 frame = game.Game()
-frame.gameLoop()
+frame.run_game()   #真人

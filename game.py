@@ -65,10 +65,10 @@ class Game:
         return foodx, foody
 
 
-    def gameLoop(self):
+    def run_game(self, train = False, action = None):
         game_run = True
 
-        snake_move_interval = 70  # 蛇移动的时间间隔（毫秒）
+        snake_move_interval = 80  # 蛇移动的时间间隔（毫秒）
         last_move_time = pygame.time.get_ticks()
 
         head_x = self.blocks // 2
@@ -82,42 +82,74 @@ class Game:
         foodx, foody = self.make_food()
 
         while game_run:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    game_run = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_LEFT:
-                        if last_key != None and last_key == pygame.K_RIGHT:
-                            pass
-                        else:
-                            x_change = -1
-                            y_change = 0
-                            last_key = event.key
-                    elif event.key == pygame.K_RIGHT:
-                        if last_key != None and last_key == pygame.K_LEFT:
-                            pass
-                        else:
-                            x_change = 1
-                            y_change = 0
-                            last_key = event.key
-                    elif event.key == pygame.K_UP:
-                        if last_key != None and last_key == pygame.K_DOWN:
-                            pass
-                        else:
-                            y_change = -1
-                            x_change = 0
-                            last_key = event.key
-                    elif event.key == pygame.K_DOWN:
-                        if last_key != None and last_key == pygame.K_UP:
-                            pass
-                        else:
-                            y_change = 1
-                            x_change = 0
-                            last_key = event.key
-                    elif event.key == pygame.K_q:
+            if train == False:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
                         game_run = False
-                    else:
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_LEFT:
+                            if last_key != None and last_key == pygame.K_RIGHT:
+                                pass
+                            else:
+                                x_change = -1
+                                y_change = 0
+                                last_key = event.key
+                        elif event.key == pygame.K_RIGHT:
+                            if last_key != None and last_key == pygame.K_LEFT:
+                                pass
+                            else:
+                                x_change = 1
+                                y_change = 0
+                                last_key = event.key
+                        elif event.key == pygame.K_UP:
+                            if last_key != None and last_key == pygame.K_DOWN:
+                                pass
+                            else:
+                                y_change = -1
+                                x_change = 0
+                                last_key = event.key
+                        elif event.key == pygame.K_DOWN:
+                            if last_key != None and last_key == pygame.K_UP:
+                                pass
+                            else:
+                                y_change = 1
+                                x_change = 0
+                                last_key = event.key
+                        elif event.key == pygame.K_q:
+                            game_run = False
+                        else:
+                            pass
+            else:
+                if action == "L":
+                    if last_key != None and last_key == "R":
                         pass
+                    else:
+                        x_change = -1
+                        y_change = 0
+                        last_key = "L"
+                elif action == "R":
+                    if last_key != None and last_key == "L":
+                        pass
+                    else:
+                        x_change = 1
+                        y_change = 0
+                        last_key = "R"
+                elif action == "U":
+                    if last_key != None and last_key == "D":
+                        pass
+                    else:
+                        y_change = -1
+                        x_change = 0
+                        last_key = "U"
+                elif action == "D":
+                    if last_key != None and last_key == "U":
+                        pass
+                    else:
+                        y_change = 1
+                        x_change = 0
+                        last_key = "D"
+                else:
+                    pass
 
             current_time = pygame.time.get_ticks()
             if current_time - last_move_time >= snake_move_interval:
@@ -126,17 +158,17 @@ class Game:
                 new_head_y = head_y + y_change
                 new_head_x_pixel = new_head_x * (self.block + self.line_width) + self.line_width
                 new_head_y_pixel = new_head_y * (self.block + self.line_width) + self.line_width
+
+                snake_Head = [new_head_x, new_head_y]
+                snake_List.append(snake_Head)
+                
                 if new_head_x_pixel >= self.win_width or new_head_x_pixel < 0 or new_head_y_pixel >= self.win_height or new_head_y_pixel < 0:
                     game_run = False
 
                 # 检测蛇是否碰到自己的身体
-                snake_Head = [new_head_x, new_head_y]
-                snake_List.append(snake_Head)
-
                 if len(snake_List) > Length_of_snake:
                     del snake_List[0]
-                # if any(segment == snake_Head for segment in snake_List[:-1]):
-                #     game_run = False
+
                 for i in range(Length_of_snake - 1):
                     if snake_Head[0] == snake_List[i][0] and snake_Head[1] == snake_List[i][1]:
                         game_run = False
@@ -161,8 +193,39 @@ class Game:
                 Length_of_snake += 1
 
             self.clock.tick(60)
+
+            if train == True:
+                if game_run == False:
+                    game_run = True
+                    head_x = self.blocks // 2
+                    head_y = self.blocks // 2
+
+                    x_change = 0
+                    y_change = 0
+                    last_key = None
+                    snake_List.clear()
+                    Length_of_snake = 1
+                    foodx, foody = self.make_food()
+                return game_run, snake_List, snake_Head, Length_of_snake, foodx, foody, self.blocks
         # message("LOSE", red)
         pygame.quit()
         quit()
 
+
+    # def reset(self):
+    #     snake_move_interval = 50  # 蛇移动的时间间隔（毫秒）
+    #     last_move_time = pygame.time.get_ticks()
+
+    #     head_x = self.blocks // 2
+    #     head_y = self.blocks // 2
+
+    #     x_change = 0
+    #     y_change = 0
+    #     last_key = None
+    #     snake_List = []
+    #     Length_of_snake = 1
+    #     foodx, foody = self.make_food()
+
+    #     state = [head_x, head_y, x_change, y_change, foodx, foody] + [x for segment in snake_List for x in segment]
+    #     return state
 
