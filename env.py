@@ -1,7 +1,10 @@
 import pygame
 import time
 import random
-
+import agent
+'''
+游戏框架
+'''
 class Game:
     pygame.init()
 
@@ -16,7 +19,7 @@ class Game:
         self.blue = (50, 153, 213)
         self.light_gray = (200, 200, 200)
         # 定义游戏窗口尺寸
-        self.blocks = 40
+        self.blocks = 30
         self.block = 20
         self.win_width = self.blocks * self.block + 1 + self.blocks
         self.win_height = self.blocks * self.block + 1 + self.blocks
@@ -29,6 +32,7 @@ class Game:
 
         self.font_style = pygame.font.SysFont("bahnschrift", 25)
         self.score_font = pygame.font.SysFont("comicsansms", 35)
+        # self.info = []
 
 
     def print_score(self, score):
@@ -65,7 +69,7 @@ class Game:
         return foodx, foody
 
 
-    def run_game(self, train = False, action = None):
+    def run_game(self, train = False, draw = True):
         game_run = True
 
         snake_move_interval = 80  # 蛇移动的时间间隔（毫秒）
@@ -120,6 +124,12 @@ class Game:
                         else:
                             pass
             else:
+
+                
+                ai = agent.AGENT(4)
+                action = ai.predict([snake_List, snake_Head, foodx, foody])
+
+
                 if action == "L":
                     if last_key != None and last_key == "R":
                         pass
@@ -177,13 +187,14 @@ class Game:
                 head_y = new_head_y
                 last_move_time = current_time
 
-            self.main_page()
-            pygame.draw.rect(self.win, self.green, [foodx, foody, self.block, self.block])
+            if draw:
+                self.main_page()
+                pygame.draw.rect(self.win, self.green, [foodx, foody, self.block, self.block])
 
-            self.show_snake(self.block, snake_List, Length_of_snake)
-            self.print_score(Length_of_snake - 1)
+                self.show_snake(self.block, snake_List, Length_of_snake)
+                self.print_score(Length_of_snake - 1)
 
-            pygame.display.update()
+                pygame.display.update()
 
         
             head_x_pixel = head_x * (self.block + self.line_width) + self.line_width
@@ -194,7 +205,11 @@ class Game:
 
             self.clock.tick(60)
 
+            
+            
             if train == True:
+                info = [[action], [game_run], [Length_of_snake], [snake_List, snake_Head, foodx, foody]]
+                ai.to_pool(info)
                 if game_run == False:
                     game_run = True
                     head_x = self.blocks // 2
@@ -206,10 +221,11 @@ class Game:
                     snake_List.clear()
                     Length_of_snake = 1
                     foodx, foody = self.make_food()
-                return game_run, snake_List, snake_Head, Length_of_snake, foodx, foody, self.blocks
+                
         # message("LOSE", red)
         pygame.quit()
         quit()
+
 
 
     # def reset(self):
