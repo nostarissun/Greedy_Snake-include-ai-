@@ -2,13 +2,16 @@ import pygame
 import time
 import random
 import agent
+import numpy as np
+import threading
+import copy
 '''
 游戏框架
 '''
 class Game:
     pygame.init()
 
-    def __init__(self):
+    def __init__(self, train, show):
         
         # 定义颜色
         self.white = (255, 255, 255)
@@ -25,13 +28,22 @@ class Game:
         self.win_height = self.blocks * self.block + 1 + self.blocks
         self.line_width = 1
         # 创建游戏窗口
-        self.win = pygame.display.set_mode((self.win_width, self.win_height))
-        pygame.display.set_caption('ai贪吃蛇')
+        # self.win = pygame.display.set_mode((self.win_width, self.win_height))
+        # pygame.display.set_caption('ai贪吃蛇')
 
-        self.clock = pygame.time.Clock()
+        # self.clock = pygame.time.Clock()
 
-        self.font_style = pygame.font.SysFont("bahnschrift", 25)
-        self.score_font = pygame.font.SysFont("comicsansms", 35)
+        # self.font_style = pygame.font.SysFont("bahnschrift", 25)
+        # self.score_font = pygame.font.SysFont("comicsansms", 35)
+        self.train = train
+        self.show = show
+        
+        self.ai = agent.AGENT((self.blocks) * (self.blocks))
+        
+        self.episodes = 6000
+        self.episode = 1
+
+
         # self.info = []
 
 
@@ -69,12 +81,17 @@ class Game:
         return foodx, foody
 
 
-    def run_game(self, train = False, draw = True):
+    def run_game(self):
         game_run = True
-
-        snake_move_interval = 80  # 蛇移动的时间间隔（毫秒）
-        last_move_time = pygame.time.get_ticks()
-
+        train = self.train
+        show = self.show
+        # snake_move_interval = 80  # 蛇移动的时间间隔（毫秒）
+        # last_move_time = pygame.time.get_ticks()
+        '''
+        蛇头为1
+        蛇身2
+        食物3
+        '''
         head_x = self.blocks // 2
         head_y = self.blocks // 2
 
@@ -82,10 +99,16 @@ class Game:
         y_change = 0
         last_key = None
         snake_List = []
+        snake_Head = [head_x, head_y]
         Length_of_snake = 1
         foodx, foody = self.make_food()
 
-        while game_run:
+        input_info = np.zeros((self.blocks, self.blocks), dtype=int)
+        
+        input_info[head_y][head_x] = 1
+        state = None
+
+        while game_run and self.episode <= self.episodes:
             if train == False:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
@@ -124,93 +147,129 @@ class Game:
                         else:
                             pass
             else:
+                try:
+                    print("```````````````````````````````````````````````````````")
+                    print(f"episode:{self.episode}")
+                    y = (foody - self.line_width) // (self.block + self.line_width)
+                    x = (foodx - self.line_width) // (self.block + self.line_width)
+                    input_info[y][x] = 3
+                    
+                    state = copy.deepcopy(input_info)
+                    action = self.ai.predict(input_info, self.show, self.episode)
+                    print(f'action:{action} || food({x}, {y}) || head({snake_Head[0]}, {snake_Head[1]})')
+                    act = {'L': 0,
+                        'R': 1,
+                        'U': 2,
+                        'D': 3}
 
-                
-                ai = agent.AGENT(4)
-                action = ai.predict([snake_List, snake_Head, foodx, foody])
+                    if action == act["L"]:
+                        if last_key != None and last_key == act["R"]:
+                            pass
+                        else:
+                            x_change = -1
+                            y_change = 0
+                            last_key = act["L"]
+                    elif action == act["R"]:
+                        if last_key != None and last_key == act["L"]:
+                            pass
+                        else:
+                            x_change = 1
+                            y_change = 0
+                            last_key = act["R"]
+                    elif action == act["U"]:
+                        if last_key != None and last_key == act["D"]:
+                            pass
+                        else:
+                            y_change = -1
+                            x_change = 0
+                            last_key = act["U"]
+                    elif action == act["D"]:
+                        if last_key != None and last_key == act["U"]:
+                            pass
+                        else:
+                            y_change = 1
+                            x_change = 0
+                            last_key = act["D"]
+                    else:
+                        pass
+                except KeyboardInterrupt:
+                    if show == False:
+                        self.ai.algo.save_model()
+                        self.ai.algo.save_target_model()
 
-
-                if action == "L":
-                    if last_key != None and last_key == "R":
-                        pass
-                    else:
-                        x_change = -1
-                        y_change = 0
-                        last_key = "L"
-                elif action == "R":
-                    if last_key != None and last_key == "L":
-                        pass
-                    else:
-                        x_change = 1
-                        y_change = 0
-                        last_key = "R"
-                elif action == "U":
-                    if last_key != None and last_key == "D":
-                        pass
-                    else:
-                        y_change = -1
-                        x_change = 0
-                        last_key = "U"
-                elif action == "D":
-                    if last_key != None and last_key == "U":
-                        pass
-                    else:
-                        y_change = 1
-                        x_change = 0
-                        last_key = "D"
-                else:
-                    pass
-
-            current_time = pygame.time.get_ticks()
-            if current_time - last_move_time >= snake_move_interval:
+            # current_time = pygame.time.get_ticks()
+            # if current_time - last_move_time >= snake_move_interval:
                 # 检测蛇是否超出边界
-                new_head_x = head_x + x_change
-                new_head_y = head_y + y_change
-                new_head_x_pixel = new_head_x * (self.block + self.line_width) + self.line_width
-                new_head_y_pixel = new_head_y * (self.block + self.line_width) + self.line_width
+            new_head_x = head_x + x_change
+            new_head_y = head_y + y_change
+            new_head_x_pixel = new_head_x * (self.block + self.line_width) + self.line_width
+            new_head_y_pixel = new_head_y * (self.block + self.line_width) + self.line_width
+            if new_head_x_pixel >= self.win_width or new_head_x_pixel < 0 or new_head_y_pixel >= self.win_height or new_head_y_pixel < 0:
+                game_run = False
 
-                snake_Head = [new_head_x, new_head_y]
-                snake_List.append(snake_Head)
-                
-                if new_head_x_pixel >= self.win_width or new_head_x_pixel < 0 or new_head_y_pixel >= self.win_height or new_head_y_pixel < 0:
+            
+            snake_Head = [new_head_x, new_head_y]
+            snake_List.append(snake_Head)
+
+            # 检测蛇是否碰到自己的身体 
+            for i in range(Length_of_snake - 1):
+                if snake_Head[0] == snake_List[i][0] and snake_Head[1] == snake_List[i][1]:
                     game_run = False
 
-                # 检测蛇是否碰到自己的身体
-                if len(snake_List) > Length_of_snake:
-                    del snake_List[0]
+            if game_run and (train or show):
+                input_info[new_head_y][new_head_x] = 1
+                input_info[head_y][head_x] = 2
 
-                for i in range(Length_of_snake - 1):
-                    if snake_Head[0] == snake_List[i][0] and snake_Head[1] == snake_List[i][1]:
-                        game_run = False
 
-                head_x = new_head_x
-                head_y = new_head_y
-                last_move_time = current_time
 
-            if draw:
-                self.main_page()
-                pygame.draw.rect(self.win, self.green, [foodx, foody, self.block, self.block])
+           
+            if len(snake_List) > Length_of_snake:
+                if show or train:
+                    input_info[snake_List[0][1]][snake_List[0][0]] = 0
 
-                self.show_snake(self.block, snake_List, Length_of_snake)
-                self.print_score(Length_of_snake - 1)
+                del snake_List[0]
 
-                pygame.display.update()
+            old_headx, old_heady = head_x, head_y
+            head_x = new_head_x
+            head_y = new_head_y
+            # last_move_time = current_time
+            #缩进截至处
 
-        
+          
+            # self.main_page()
+            # pygame.draw.rect(self.win, self.green, [foodx, foody, self.block, self.block])
+
+            # self.show_snake(self.block, snake_List, Length_of_snake)
+            # self.print_score(Length_of_snake - 1)
+
+            # pygame.display.update()
+
+            eat = False
+            food = [(foodx - self.line_width) // (self.block + self.line_width), (foody - self.line_width) // (self.block + self.line_width)]
+            
             head_x_pixel = head_x * (self.block + self.line_width) + self.line_width
             head_y_pixel = head_y * (self.block + self.line_width) + self.line_width
             if head_x_pixel == foodx and head_y_pixel == foody:
+                if train or show:
+                    input_info[(foody - self.line_width) // (self.block + self.line_width)][(foodx - self.line_width) // (self.block + self.line_width)] = 3
                 foodx, foody = self.make_food()
+                eat = True
                 Length_of_snake += 1
 
-            self.clock.tick(60)
+            
+            # self.clock.tick(60)
 
             
             
             if train == True:
-                info = [[action], [game_run], [Length_of_snake], [snake_List, snake_Head, foodx, foody]]
-                ai.to_pool(info)
+                  
+                info = [action, game_run, Length_of_snake, input_info, [eat, food, [head_x, head_y], [old_headx, old_heady]], state]
+                self.ai.to_pool(info)
+                
                 if game_run == False:
+                    
+                    self.ai.learn(self.episode)
+                    self.episode += 1
                     game_run = True
                     head_x = self.blocks // 2
                     head_y = self.blocks // 2
@@ -221,10 +280,15 @@ class Game:
                     snake_List.clear()
                     Length_of_snake = 1
                     foodx, foody = self.make_food()
+                        
+
+            if self.episode % 120 == 0:
+                self.ai.algo.save_model()
+                self.ai.algo.save_target_model()
                 
-        # message("LOSE", red)
-        pygame.quit()
-        quit()
+
+        # pygame.quit()
+        # quit()
 
 
 
