@@ -98,7 +98,8 @@ class AGENT():
         value = self.algo.predictQ(obs)
         # print(value)
         if show:
-            v = value[0]
+            # v = value[0]
+            v = value
             # print(max_value)
 
             max_indices = []
@@ -117,7 +118,9 @@ class AGENT():
                 # print("！随机选择！")
                 return random.randint(0, 2)
             else:
-                v = value[0]
+                # print(value)
+                # v = value[0]
+                v = value
                 # print(max_value)
 
                 max_indices = []

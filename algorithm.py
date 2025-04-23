@@ -47,12 +47,14 @@ class ALGO():
         "获取Q(s, a1), Q(s, a2)..."
         obs = data.copy()
         
-        return self.Qvalue.value(torch.FloatTensor(obs).unsqueeze(0).unsqueeze(0).to(self.device))
+        # return self.Qvalue.value(torch.FloatTensor(obs).unsqueeze(0).unsqueeze(0).to(self.device))
+        return self.Qvalue.value(torch.FloatTensor(obs).to(self.device))
     
     def predict_taregt(self, data):
         obs = data.copy()
         
-        return self.TargetQ.value(torch.FloatTensor(obs).unsqueeze(0).unsqueeze(0).to(self.device))
+        # return self.TargetQ.value(torch.FloatTensor(obs).unsqueeze(0).unsqueeze(0).to(self.device))
+        return self.TargetQ.value(torch.FloatTensor(obs).to(self.device))
 
     def calculate_distance(self, head_x, head_y, food_x, food_y):
         return math.sqrt((head_x - food_x) ** 2 + (head_y - food_y) ** 2)
@@ -72,12 +74,18 @@ class ALGO():
 
         self.max_reward = max(rewards, self.max_reward)
         
-        state_tensor = torch.FloatTensor(states).unsqueeze(0).unsqueeze(0).to(self.device)
-        current_q = self.Qvalue.value(state_tensor)[0][actions]
+        # state_tensor = torch.FloatTensor(states).unsqueeze(0).unsqueeze(0).to(self.device)
+        # current_q = self.Qvalue.value(state_tensor)[0][actions]
 
-        # 计算目标Q值
-        next_state_tensor = torch.FloatTensor(next_states).unsqueeze(0).unsqueeze(0).to(self.device)
-        next_q = self.TargetQ.value(next_state_tensor).max(1)[0]
+        # # 计算目标Q值
+        # next_state_tensor = torch.FloatTensor(next_states).unsqueeze(0).unsqueeze(0).to(self.device)
+        # next_q = self.TargetQ.value(next_state_tensor).max(1)[0]
+
+        state_tensor = torch.FloatTensor(states).to(self.device)
+        current_q = self.Qvalue.value(state_tensor)[actions]
+        next_state_tensor = torch.FloatTensor(next_states).to(self.device)
+        next_q = max(self.TargetQ.value(next_state_tensor))
+
         target_q = rewards + (1 - dones) * self.gamma * next_q
         
         loss = F.mse_loss(current_q, target_q)
