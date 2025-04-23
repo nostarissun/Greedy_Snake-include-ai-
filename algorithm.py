@@ -7,7 +7,7 @@ import model
 import math
 import torch.nn.functional as F
 import numpy as np
-
+import copy
 
 
 class ALGO():
@@ -15,20 +15,18 @@ class ALGO():
         self.inputsize = inputsize
         self.outsize = outsize
         self.device = device
-        self.gamma = 0.7
+        self.gamma = 0.8
         self.first_lr = 0.0001
-        
-
+        #初始状态需要同步参数
+        net = model.Net(inputsize, outsize)
         self.Qvalue = model.DQN(
-            model.Net(inputsize, outsize), inputsize, gamma = self.gamma, lr = self.first_lr
+            net
             )
         self.TargetQ = model.DQN(
-            model.Net(inputsize, outsize), inputsize, gamma= self.gamma, lr = self.first_lr
+            copy.deepcopy(net)
             )
-
-        
         self.optimizer = optim.Adam(self.Qvalue.parameters(), lr = self.first_lr)
-        self.TargetOptim = optim.Adam(self.TargetQ.parameters(), lr = self.first_lr)
+        # self.TargetOptim = optim.Adam(self.TargetQ.parameters(), lr = self.first_lr)
 
         self.Qvalue.to(device)
         self.TargetQ.to(device)
@@ -37,39 +35,34 @@ class ALGO():
         try:
             self.Qvalue.load_state_dict(torch.load('model.pth', weights_only=False))
             self.optimizer.load_state_dict(torch.load('optimizer.pth', weights_only=False))
-            print("成功加载已有Q模型！")
+            print("成功加载已有Q模型及参数！")
             self.TargetQ.load_state_dict(torch.load('target.pth', weights_only=False))
-            self.TargetOptim.load_state_dict(torch.load('targetoptimizer.pth', weights_only=False))
             print("成功加载已有目标模型！")
         except:
             print("未检测到已有模型！将重新训练")
 
 
 
-    def predictQ(self, obs):
+    def predictQ(self, data):
         "获取Q(s, a1), Q(s, a2)..."
-        # tensor = torch.tensor(obs, dtype=torch.int)
-        # obs = torch.FloatTensor(obs).to(self.device) / 3.0
-        # 转换为 float32 并归一化
-        obs = (
-            torch.FloatTensor(obs)
-            .unsqueeze(0)  
-            .unsqueeze(0)  
-            .to(self.device)
-            / 3.0
-        )
-        return self.Qvalue.value(obs)
+        obs = data.copy()
+        
+        return self.Qvalue.value(torch.FloatTensor(obs).unsqueeze(0).unsqueeze(0).to(self.device))
     
-    def predict_taregt(self, obs):
-        return self.TargetQ.value(obs)
+    def predict_taregt(self, data):
+        obs = data.copy()
+        
+        return self.TargetQ.value(torch.FloatTensor(obs).unsqueeze(0).unsqueeze(0).to(self.device))
 
     def calculate_distance(self, head_x, head_y, food_x, food_y):
         return math.sqrt((head_x - food_x) ** 2 + (head_y - food_y) ** 2)
 
-    def learn(self, obs, save):
+    def learn(self, data, save, rewards):
         '''
         info = [action, game_run, Length_of_snake, s', [eat, food[], [head_x, head_y], [old_headx, old_heady]], s]
         '''
+        obs = data.copy()
+
         states = obs[5]
         actions = obs[0]
         next_states = obs[3]
@@ -77,61 +70,20 @@ class ALGO():
         length = obs[2]
         small = obs[4]
 
-
-        rewards = 0.5  # 增加存活奖励
-        if small[0]:
-            rewards += 50  # 提高吃到食物奖励
-        old_dis = abs(small[3][0] - small[1][0]) + abs(small[3][1] - small[1][1])  # 改用曼哈顿距离
-        new_dis = abs(small[2][0] - small[1][0]) + abs(small[2][1] - small[1][1])
-        rewards += 2.0 * (old_dis - new_dis)  # 加大距离差系数
-        if dones:
-            rewards -= 50  
-
-
-        # old_dis = self.calculate_distance(small[3][0], small[3][1], small[1][0], small[1][1])
-        # new_dis = self.calculate_distance(small[2][0], small[2][1], small[1][0], small[1][1])
-
-        if rewards > self.max_reward:
-            self.max_reward = rewards
-        # states = torch.FloatTensor(states).view(-1, self.inputsize).to(self.device) / 3.0
-        # next_states = torch.FloatTensor(next_states).view(-1, self.inputsize).to(self.device) / 3.0
-        states = (
-            torch.FloatTensor(states)                # 转换为张量 (shape: [30, 30])
-            .unsqueeze(0)                            # 添加批次维度 → [1, 30, 30]
-            .unsqueeze(0)                            # 添加通道维度 → [1, 1, 30, 30]
-            .to(self.device)                         # 转移至设备（GPU/CPU）
-            / 3.0                                    # 归一化
-        )
-
-        next_states = (
-            torch.FloatTensor(next_states)
-            .unsqueeze(0)
-            .unsqueeze(0)
-            .to(self.device)
-            / 3.0
-        )
+        self.max_reward = max(rewards, self.max_reward)
         
+        state_tensor = torch.FloatTensor(states).unsqueeze(0).unsqueeze(0).to(self.device)
+        current_q = self.Qvalue.value(state_tensor)[0][actions]
 
-        current_q = self.Qvalue.value(states)  
-
-        actions = torch.tensor([actions], dtype=torch.long).unsqueeze(1).to(self.device)  
-        current_q_selected = current_q.gather(1, actions)  
-
-        with torch.no_grad():
-            # 使用目标网络计算下一个状态的Q值
-            next_q_values = self.TargetQ.value(next_states)
-            max_next_q = next_q_values.max(1)[0].unsqueeze(1)  # 取每行最大值
-            target_q = rewards + (1 - dones) * self.gamma * max_next_q
+        # 计算目标Q值
+        next_state_tensor = torch.FloatTensor(next_states).unsqueeze(0).unsqueeze(0).to(self.device)
+        next_q = self.TargetQ.value(next_state_tensor).max(1)[0]
+        target_q = rewards + (1 - dones) * self.gamma * next_q
         
-    
-        loss = F.smooth_l1_loss(current_q_selected, target_q)
+        loss = F.mse_loss(current_q, target_q)
         
-
-        
-        # 梯度裁剪（防止震荡）
+        # 添加梯度裁剪
         torch.nn.utils.clip_grad_norm_(self.Qvalue.parameters(), 1.0)
-        
-
         if save:
             with open('loss.txt', 'a', encoding='utf-8') as f:
                 f.write(str(loss.item()) + '\n')
@@ -144,7 +96,7 @@ class ALGO():
         loss.backward()
         self.optimizer.step()
 
-        print(f"loss:{loss.item()}  || reward:{rewards} || max_reward:{self.max_reward}")
+        # print(f"loss:{loss.item()}  || reward:{rewards} || max_reward:{self.max_reward}")
 
     def save_model(self):
         torch.save(self.Qvalue.state_dict(), 'model.pth')
@@ -153,7 +105,7 @@ class ALGO():
 
     def save_target_model(self):
         torch.save(self.TargetQ.state_dict(), 'target.pth')
-        torch.save(self.TargetOptim.state_dict(), 'targetoptimizer.pth')
+        # torch.save(self.TargetOptim.state_dict(), 'targetoptimizer.pth')
 
     def show_model(self):
         try:
